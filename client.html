@@ -2,77 +2,91 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
 <title>Bella</title>
 <style>
   :root {
     --felt: #1F3327; --felt-dark: #162419; --brass: #C9A24B; --brass-dim: #8a703a;
     --cream: #F2EAD8; --ink: #1A1410; --heart-red: #8B3A3A; --line: rgba(201,162,75,0.35);
+    --team-a: #4A7A5C; --team-b: #7A4A5C;
   }
-  * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; overflow-x: hidden; }
   body { background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 100%); color: var(--cream); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
 
   /* ── LOBBY ── */
-  .lobby { display: flex; align-items: center; justify-content: center; min-height: 100vh; }
-  .lobby-card { background: rgba(0,0,0,0.3); border: 1px solid var(--line); border-radius: 16px; padding: 40px 48px; width: 360px; text-align: center; }
+  .lobby { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 16px; }
+  .lobby-card { background: rgba(0,0,0,0.3); border: 1px solid var(--line); border-radius: 16px; padding: 32px 28px; width: 100%; max-width: 400px; text-align: center; }
   .lobby-card h1 { font-family: Georgia, serif; color: var(--brass); font-size: 36px; margin: 0 0 6px; }
-  .lobby-card .sub { font-size: 12px; opacity: 0.6; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 28px; }
-  .lobby-card input { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; color: var(--cream); font-size: 14px; margin-bottom: 10px; outline: none; }
+  .lobby-card .sub { font-size: 12px; opacity: 0.6; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 24px; }
+  .lobby-card input { width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 8px; padding: 13px 14px; color: var(--cream); font-size: 16px; margin-bottom: 10px; outline: none; }
+  .lobby-card input::placeholder { color: rgba(242,234,216,0.4); }
   .lobby-card input:focus { border-color: var(--brass); }
-  .lobby-card .or { font-size: 12px; opacity: 0.5; margin: 14px 0; }
-  .lobby-card .room-code-input { letter-spacing: 4px; text-transform: uppercase; font-size: 18px; text-align: center; }
-  .lobby-card .error { color: #c97a7a; font-size: 13px; min-height: 20px; margin-bottom: 8px; }
-  .waiting { font-size: 13px; opacity: 0.7; margin-top: 16px; line-height: 1.6; }
-  .room-code-display { font-family: Georgia, serif; font-size: 32px; color: var(--brass); letter-spacing: 6px; margin: 8px 0; }
+  .room-code-input { letter-spacing: 4px; text-transform: uppercase; font-size: 20px; text-align: center; }
+  .error { color: #c97a7a; font-size: 13px; min-height: 20px; margin-top: 6px; }
+  .or { font-size: 12px; opacity: 0.5; margin: 14px 0; }
+  .room-code-display { font-family: Georgia, serif; font-size: 36px; color: var(--brass); letter-spacing: 8px; margin: 8px 0 4px; }
+
+  /* ── TEAM PICKER ── */
+  .team-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  .team-col { border: 1px solid var(--line); border-radius: 10px; padding: 14px 10px; min-height: 120px; }
+  .team-col.team-a { border-color: var(--team-a); }
+  .team-col.team-b { border-color: var(--team-b); }
+  .team-col h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: 1px; text-transform: uppercase; }
+  .team-col.team-a h3 { color: #7ABA9A; }
+  .team-col.team-b h3 { color: #BA7A9A; }
+  .team-member { font-size: 13px; padding: 4px 0; opacity: 0.9; }
+  .team-member.empty { opacity: 0.35; font-style: italic; }
+  .team-btn { width: 100%; margin-top: 8px; padding: 12px; border: none; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .team-btn.a { background: var(--team-a); color: #fff; }
+  .team-btn.b { background: var(--team-b); color: #fff; }
+  .team-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .waiting-msg { font-size: 13px; opacity: 0.65; margin-top: 12px; line-height: 1.6; }
 
   /* ── LAYOUT ── */
-  .app { display: grid; grid-template-columns: 1fr 300px; min-height: 100vh; }
-  .table-wrap { padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .titlebar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 10px; }
-  .titlebar h1 { font-family: Georgia, serif; font-size: 26px; margin: 0; color: var(--brass); }
-  .titlebar .sub { font-size: 12px; opacity: 0.6; letter-spacing: 1px; text-transform: uppercase; }
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
+  .table-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .titlebar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+  .titlebar h1 { font-family: Georgia, serif; font-size: 22px; margin: 0; color: var(--brass); }
+  .titlebar .sub { font-size: 11px; opacity: 0.6; letter-spacing: 1px; text-transform: uppercase; }
 
-  /* ── PLAYER VIEW BOARD ── */
-  .pv-board { flex: 1; display: grid; grid-template-rows: auto 1fr auto; min-height: 500px; border: 1px solid var(--line); border-radius: 16px; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.25) 100%); padding: 18px; gap: 10px; }
+  /* ── BOARD ── */
+  .pv-board { flex: 1; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 0%, rgba(0,0,0,0.25) 100%); padding: 12px; gap: 8px; }
   .pv-top-row { display: flex; justify-content: center; }
-  .pv-middle { display: flex; align-items: center; justify-content: center; gap: 48px; }
-  .pv-opp { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-  .pv-opp-label { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--brass); display: flex; align-items: center; gap: 5px; }
-  .pv-opp-label.active { color: var(--ink); background: var(--brass); padding: 2px 9px; border-radius: 9px; }
-  .pv-opp-label.disconnected { color: #c97a7a; opacity: 0.8; }
+  .pv-middle { display: flex; align-items: center; justify-content: center; gap: 16px; flex: 1; }
+  .pv-opp { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .pv-opp-label { font-size: 10px; letter-spacing: 1px; text-transform: uppercase; color: var(--brass); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .pv-opp-label.active { color: var(--ink); background: var(--brass); padding: 2px 8px; border-radius: 8px; }
+  .pv-opp-label.disconnected { color: #c97a7a; }
   .pv-cardback-row { display: flex; }
-  .pv-cardback { width: 26px; height: 38px; background: repeating-linear-gradient(45deg, var(--felt) 0, var(--felt) 4px, var(--felt-dark) 4px, var(--felt-dark) 8px); border: 1px solid var(--brass-dim); border-radius: 3px; margin-left: -12px; }
+  .pv-cardback { width: 22px; height: 32px; background: repeating-linear-gradient(45deg, var(--felt) 0, var(--felt) 4px, var(--felt-dark) 4px, var(--felt-dark) 8px); border: 1px solid var(--brass-dim); border-radius: 3px; margin-left: -10px; }
   .pv-cardback:first-child { margin-left: 0; }
-  .pv-opp-info { font-size: 10px; opacity: 0.6; }
+  .pv-opp-info { font-size: 10px; opacity: 0.55; }
   .pv-side-opp .pv-cardback-row { flex-direction: column; }
-  .pv-side-opp .pv-cardback { margin-left: 0; margin-top: -22px; }
+  .pv-side-opp .pv-cardback { margin-left: 0; margin-top: -18px; }
   .pv-side-opp .pv-cardback:first-child { margin-top: 0; }
-
-  .pv-trick-area { width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0,0,0,0.18) 0%, transparent 70%); position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-  .trick-card-pos { position: absolute; width: 52px; height: 76px; }
+  .pv-trick-area { width: 150px; height: 150px; border-radius: 50%; background: radial-gradient(ellipse at center, rgba(0,0,0,0.18) 0%, transparent 70%); position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .trick-card-pos { position: absolute; width: 44px; height: 64px; }
   .tcp-bottom { bottom: 0; left: 50%; transform: translateX(-50%); }
   .tcp-top { top: 0; left: 50%; transform: translateX(-50%); }
   .tcp-left { left: 0; top: 50%; transform: translateY(-50%); }
   .tcp-right { right: 0; top: 50%; transform: translateY(-50%); }
   .trump-badge { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; pointer-events: none; }
-  .trump-badge .suit-icon { width: 34px; height: 34px; opacity: 0.85; }
-  .trump-badge .label { font-size: 9px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.7; margin-top: 3px; }
-
-  .pv-hand-zone { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 8px; border-top: 1px solid var(--line); }
-  .pv-you-label { font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--brass); }
+  .trump-badge .suit-icon { width: 30px; height: 30px; opacity: 0.85; }
+  .trump-badge .label { font-size: 8px; letter-spacing: 1.2px; text-transform: uppercase; opacity: 0.7; margin-top: 2px; }
+  .pv-hand-zone { display: flex; flex-direction: column; align-items: center; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+  .pv-you-label { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--brass); }
   .pv-you-label.your-turn { color: var(--ink); background: var(--brass); padding: 3px 12px; border-radius: 10px; }
-  .pv-hand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .pv-hand-grid .card { width: 76px; height: 110px; }
-  .pv-hand-grid .card .rank { font-size: 21px; }
-  .pv-hand-grid .card .suit-icon { width: 24px; height: 24px; }
+  .pv-hand-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; width: 100%; max-width: 360px; }
+  .pv-hand-grid .card { width: 100%; aspect-ratio: 0.69; min-height: 90px; }
+  .pv-hand-grid .card .rank { font-size: 18px; }
+  .pv-hand-grid .card .suit-icon { width: 20px; height: 20px; }
 
   /* ── CARDS ── */
-  .card { background: linear-gradient(160deg, var(--cream) 0%, #e8dec4 100%); border-radius: 6px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Georgia, serif; font-weight: 700; cursor: pointer; transition: transform 0.12s ease, box-shadow 0.12s ease; user-select: none; }
-  .card:hover:not(.disabled):not(.played) { transform: translateY(-6px); box-shadow: 0 6px 12px rgba(0,0,0,0.4); }
+  .card { background: linear-gradient(160deg, var(--cream) 0%, #e8dec4 100%); border-radius: 6px; border: 1px solid rgba(0,0,0,0.25); box-shadow: 0 2px 4px rgba(0,0,0,0.3); color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Georgia, serif; font-weight: 700; cursor: pointer; transition: transform 0.1s ease; user-select: none; }
+  .card:active:not(.disabled):not(.played) { transform: translateY(-4px); }
   .card.disabled { opacity: 0.32; cursor: not-allowed; }
   .card.played { cursor: default; }
-  .card.played:hover { transform: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
   .card.trump-card { box-shadow: 0 0 0 2px var(--brass), 0 2px 4px rgba(0,0,0,0.3); }
   .card .rank { font-size: 17px; line-height: 1; }
   .card .suit-icon { width: 20px; height: 20px; margin-top: 2px; }
@@ -82,39 +96,49 @@
   .card.suit-leaves { color: #2c4a3e; }
 
   /* ── SIDEBAR ── */
-  .sidebar { background: rgba(0,0,0,0.22); border-left: 1px solid var(--line); padding: 18px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
-  .panel { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: rgba(0,0,0,0.18); }
-  .panel h3 { margin: 0 0 10px 0; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--brass); font-weight: 600; }
-  .score-row { display: flex; justify-content: space-between; font-size: 14px; padding: 3px 0; }
-  .score-row .val { font-family: Georgia, serif; font-size: 20px; color: var(--brass); }
-  .btn { background: var(--brass); color: var(--ink); border: none; border-radius: 6px; padding: 9px 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
-  .btn:hover { background: #d9b462; }
+  .sidebar { background: rgba(0,0,0,0.22); border-top: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .panels-row { display: flex; gap: 10px; }
+  .panels-row .panel { flex: 1; }
+  .panel { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: rgba(0,0,0,0.18); }
+  .panel h3 { margin: 0 0 8px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 1.5px; color: var(--brass); font-weight: 600; }
+  .score-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 2px 0; }
+  .score-row .val { font-family: Georgia, serif; font-size: 18px; color: var(--brass); }
+  .score-row .team-a-label { color: #7ABA9A; }
+  .score-row .team-b-label { color: #BA7A9A; }
+  .btn { background: var(--brass); color: var(--ink); border: none; border-radius: 8px; padding: 12px 16px; font-weight: 700; font-size: 15px; cursor: pointer; width: 100%; margin-top: 6px; }
+  .btn:active { background: #d9b462; }
   .btn.secondary { background: transparent; color: var(--cream); border: 1px solid var(--line); }
-  .btn.secondary:hover { border-color: var(--brass); }
-  .suit-pick-row { display: flex; gap: 7px; margin-top: 8px; flex-wrap: wrap; }
-  .suit-btn { border: 1px solid var(--line); background: rgba(255,255,255,0.04); border-radius: 8px; padding: 7px 9px; display: flex; align-items: center; gap: 5px; cursor: pointer; color: var(--cream); font-size: 13px; }
-  .suit-btn:hover { border-color: var(--brass); }
-  .suit-btn .suit-icon { width: 16px; height: 16px; }
-  .log { font-size: 12px; line-height: 1.5; max-height: 200px; overflow-y: auto; display: flex; flex-direction: column-reverse; }
+  .suit-pick-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .suit-btn { border: 1px solid var(--line); background: rgba(255,255,255,0.04); border-radius: 8px; padding: 11px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; cursor: pointer; color: var(--cream); font-size: 14px; }
+  .suit-btn:active { border-color: var(--brass); }
+  .suit-btn .suit-icon { width: 18px; height: 18px; }
+  .log { font-size: 12px; line-height: 1.5; max-height: 120px; overflow-y: auto; display: flex; flex-direction: column-reverse; }
   .log .entry { padding: 2px 0; border-bottom: 1px dashed rgba(255,255,255,0.07); opacity: 0.85; }
   .log .entry.notice { color: var(--brass); opacity: 1; }
-  .meld-item { display: flex; justify-content: space-between; padding: 3px 6px; background: rgba(255,255,255,0.04); border-radius: 5px; font-size: 12px; margin-bottom: 3px; }
+  .meld-item { display: flex; justify-content: space-between; padding: 4px 6px; background: rgba(255,255,255,0.04); border-radius: 5px; font-size: 12px; margin-bottom: 3px; }
   .empty-note { font-size: 12px; opacity: 0.5; font-style: italic; }
-  .waiting-confirm { font-size: 12px; opacity: 0.65; margin-top: 6px; }
+  .waiting-confirm { font-size: 12px; opacity: 0.65; margin-top: 6px; text-align: center; }
 
-  @media (max-width: 860px) {
-    .app { grid-template-columns: 1fr; }
-    .sidebar { border-left: none; border-top: 1px solid var(--line); }
+  @media (min-width: 860px) {
+    .app { flex-direction: row; }
+    .table-wrap { padding: 20px; gap: 14px; }
+    .sidebar { border-top: none; border-left: 1px solid var(--line); padding: 18px; width: 300px; flex-shrink: 0; overflow-y: auto; }
+    .panels-row { flex-direction: column; }
+    .pv-trick-area { width: 180px; height: 180px; }
+    .trick-card-pos { width: 52px; height: 76px; }
+    .pv-middle { gap: 48px; }
+    .pv-hand-grid { max-width: 380px; gap: 8px; }
+    .pv-hand-grid .card { min-height: 110px; }
+    .pv-hand-grid .card .rank { font-size: 21px; }
+    .btn { font-size: 13px; padding: 9px 14px; }
   }
 </style>
 </head>
 <body>
 <div id="root"></div>
-
 <script>
 "use strict";
 
-// ── SUIT SVG PATHS ──
 const SUIT_PATHS = {
   hearts: 'M12 21s-7.5-4.6-10-9.3C.4 8.3 2 4.8 5.4 4.2 7.7 3.8 10 5 12 8c2-3 4.3-4.2 6.6-3.8C22 4.8 23.6 8.3 22 11.7 19.5 16.4 12 21 12 21z',
   bells: 'M12 2c-1 0-1.8.8-1.8 1.8v.6C7.2 5.2 5 7.8 5 11v4l-2 3h18l-2-3v-4c0-3.2-2.2-5.8-5.2-6.6v-.6C13.8 2.8 13 2 12 2zM9 19a3 3 0 0 0 6 0z',
@@ -123,7 +147,6 @@ const SUIT_PATHS = {
 };
 const SUIT_LABEL = { hearts: "Hearts", bells: "Bells", acorns: "Acorns", leaves: "Leaves" };
 const SUITS = ["hearts", "bells", "acorns", "leaves"];
-const NATURAL_ORDER = ["7", "8", "9", "10", "J", "Q", "K", "A"];
 const NONTRUMP_ORDER = ["7", "8", "9", "J", "Q", "K", "10", "A"];
 const TRUMP_ORDER = ["7", "8", "Q", "K", "10", "A", "9", "J"];
 const SUIT_DISPLAY_ORDER = ["hearts", "bells", "acorns", "leaves"];
@@ -135,34 +158,33 @@ function esc(s) {
   return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 function rankIndex(card, trumpSuit) {
-  const order = card.suit === trumpSuit ? TRUMP_ORDER : NONTRUMP_ORDER;
-  return order.indexOf(card.rank);
+  return (card.suit === trumpSuit ? TRUMP_ORDER : NONTRUMP_ORDER).indexOf(card.rank);
 }
 function sortHand(hand, trumpSuit) {
   return hand.filter(c => !c.hidden).slice().sort((a, b) => {
     const sd = SUIT_DISPLAY_ORDER.indexOf(a.suit) - SUIT_DISPLAY_ORDER.indexOf(b.suit);
-    if (sd !== 0) return sd;
-    return rankIndex(b, trumpSuit) - rankIndex(a, trumpSuit);
+    return sd !== 0 ? sd : rankIndex(b, trumpSuit) - rankIndex(a, trumpSuit);
   });
 }
 
-// ── STATE ──
 let ws = null;
 let myName = "";
 let mySeat = null;
+let myTeam = null;
 let myRoomCode = null;
-let gameState = null; // latest state from server
+let gameState = null;
+let pendingRoomCode = null; // code created, waiting for team pick
 
-// ── LOBBY ──
+// ── LOBBY SCREENS ──
 function renderLobby(error) {
   document.getElementById("root").innerHTML =
     '<div class="lobby"><div class="lobby-card">' +
       '<h1>Bella</h1><div class="sub">4-player partnership card game</div>' +
-      '<input id="name-input" placeholder="Your name" maxlength="20" />' +
-      '<button class="btn" style="width:100%;margin-bottom:4px;" onclick="doCreate()">Create new room</button>' +
+      '<input id="name-input" placeholder="Your name" maxlength="20" autocomplete="off" />' +
+      '<button class="btn" onclick="doCreate()">Create new room</button>' +
       '<div class="or">— or join existing —</div>' +
-      '<input id="code-input" class="room-code-input" placeholder="ROOM CODE" maxlength="4" />' +
-      '<button class="btn secondary" style="width:100%;margin-top:6px;" onclick="doJoin()">Join room</button>' +
+      '<input id="code-input" class="room-code-input" placeholder="ROOM CODE" maxlength="4" autocomplete="off" />' +
+      '<button class="btn secondary" onclick="doJoinWithCode()">Join room</button>' +
       '<div class="error">' + esc(error || "") + '</div>' +
     '</div></div>';
   const nameIn = document.getElementById("name-input");
@@ -171,21 +193,29 @@ function renderLobby(error) {
   if (codeIn) codeIn.addEventListener("input", e => { e.target.value = e.target.value.toUpperCase(); });
 }
 
-function renderWaiting(code, players) {
-  const seats = players || [null, null, null, null];
-  const filled = seats.filter(p => p !== null).length;
-  const list = seats.map((p, i) =>
-    '<div style="padding:4px 0;font-size:13px;opacity:' + (p ? '1' : '0.4') + ';">' +
-    (p ? '✓ ' + esc(p.name) : 'Seat ' + (i+1) + ' — waiting...') + '</div>'
+function renderTeamPicker(code, teamA, teamB, error) {
+  const aFull = teamA.filter(Boolean).length >= 2;
+  const bFull = teamB.filter(Boolean).length >= 2;
+  const memberHtml = (members) => members.map((m, i) =>
+    '<div class="team-member' + (m ? '' : ' empty') + '">' + esc(m || ('Slot ' + (i+1) + ' open')) + '</div>'
   ).join("");
+
   document.getElementById("root").innerHTML =
     '<div class="lobby"><div class="lobby-card">' +
       '<h1>Bella</h1>' +
       '<div class="sub">Room code</div>' +
       '<div class="room-code-display">' + esc(code) + '</div>' +
-      '<div style="font-size:12px;opacity:0.6;margin-bottom:16px;">Share this code with 3 friends</div>' +
-      '<div style="text-align:left;">' + list + '</div>' +
-      '<div class="waiting">' + filled + '/4 players connected — game starts when all 4 join.</div>' +
+      '<div style="font-size:12px;opacity:0.6;margin-bottom:12px;">Share this code — then pick your team</div>' +
+      '<div class="team-grid">' +
+        '<div class="team-col team-a"><h3>Team A</h3>' + memberHtml(teamA) +
+          '<button class="team-btn a" onclick="doJoinTeam(\'A\')" ' + (aFull ? 'disabled' : '') + '>Join Team A</button>' +
+        '</div>' +
+        '<div class="team-col team-b"><h3>Team B</h3>' + memberHtml(teamB) +
+          '<button class="team-btn b" onclick="doJoinTeam(\'B\')" ' + (bFull ? 'disabled' : '') + '>Join Team B</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="waiting-msg">Game starts when both teams have 2 players.</div>' +
+      '<div class="error">' + esc(error || "") + '</div>' +
     '</div></div>';
 }
 
@@ -193,39 +223,61 @@ function doCreate() {
   const name = (document.getElementById("name-input")?.value || "").trim();
   if (!name) { renderLobby("Enter your name first."); return; }
   myName = name;
-  connectAndSend({ type: "join", name });
+  connectAndSend({ type: "create", name });
 }
-function doJoin() {
+
+function doJoinWithCode() {
   const name = (document.getElementById("name-input")?.value || "").trim();
   const code = (document.getElementById("code-input")?.value || "").trim().toUpperCase();
   if (!name) { renderLobby("Enter your name first."); return; }
   if (code.length !== 4) { renderLobby("Enter the 4-letter room code."); return; }
   myName = name;
-  connectAndSend({ type: "join", name, code });
+  pendingRoomCode = code;
+  renderTeamPicker(code, [null, null], [null, null], "");
+  connectAndSend(null); // just connect, team pick sends the actual join
+}
+
+function doJoinTeam(team) {
+  const code = pendingRoomCode || myRoomCode;
+  if (!code) return;
+  send({ type: "join", name: myName, code, team });
 }
 
 function connectAndSend(msg) {
-  if (ws && ws.readyState === WebSocket.OPEN) { ws.send(JSON.stringify(msg)); return; }
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    if (msg) ws.send(JSON.stringify(msg));
+    return;
+  }
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
   ws = new WebSocket(proto + "//" + location.host);
-  ws.onopen = () => ws.send(JSON.stringify(msg));
+  ws.onopen = () => { if (msg) ws.send(JSON.stringify(msg)); };
   ws.onmessage = onMessage;
   ws.onerror = () => renderLobby("Connection failed. Is the server running?");
-  ws.onclose = () => {
-    if (gameState) { showError("Disconnected from server. Please refresh."); }
-  };
+  ws.onclose = () => { if (gameState) showError("Disconnected. Please refresh."); };
+}
+
+function send(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
 }
 
 function onMessage(event) {
   const msg = JSON.parse(event.data);
-  if (msg.type === "joined") {
-    mySeat = msg.seat;
+  if (msg.type === "created") {
+    pendingRoomCode = msg.roomCode;
     myRoomCode = msg.roomCode;
-    renderWaiting(msg.roomCode, null);
+    renderTeamPicker(msg.roomCode, [null, null], [null, null], "");
+  } else if (msg.type === "joined") {
+    mySeat = msg.seat;
+    myTeam = msg.team;
+    myRoomCode = msg.roomCode;
+    pendingRoomCode = msg.roomCode;
   } else if (msg.type === "state") {
     gameState = msg.state;
-    if (gameState.phase === "lobby" || (gameState.players.filter(p=>p).length < 4 && gameState.phase === "lobby")) {
-      renderWaiting(myRoomCode, gameState.players);
+    const teamA = gameState.teamA || [null, null];
+    const teamB = gameState.teamB || [null, null];
+    const bothTeamsReady = teamA.filter(Boolean).length === 2 && teamB.filter(Boolean).length === 2;
+    if (!bothTeamsReady || gameState.phase === "lobby") {
+      renderTeamPicker(myRoomCode, teamA, teamB, "");
     } else {
       renderGame();
     }
@@ -234,16 +286,12 @@ function onMessage(event) {
   }
 }
 
-function send(obj) {
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(obj));
-}
-
 function showError(msg) {
   let el = document.getElementById("error-toast");
   if (!el) {
     el = document.createElement("div");
     el.id = "error-toast";
-    el.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#8B2020;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:999;";
+    el.style.cssText = "position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#8B2020;color:#fff;padding:12px 20px;border-radius:8px;font-size:14px;z-index:999;max-width:90vw;text-align:center;";
     document.body.appendChild(el);
   }
   el.textContent = msg;
@@ -251,15 +299,8 @@ function showError(msg) {
   el._t = setTimeout(() => el.remove(), 4000);
 }
 
-// ── GAME RENDERING ──
+// ── GAME ──
 const TRICK_POS_MAP = { 0: "tcp-bottom", 1: "tcp-right", 2: "tcp-top", 3: "tcp-left" };
-
-function visualSeat(absoluteSeat, mySeat) {
-  // Map absolute seat to visual position relative to mySeat
-  // mySeat=bottom(0), partner=top(2), right(1), left(3) from mySeat's perspective
-  const delta = (absoluteSeat - mySeat + 4) % 4;
-  return delta; // 0=me(bottom), 1=right, 2=top, 3=left
-}
 
 function renderGame() {
   const g = gameState;
@@ -272,15 +313,9 @@ function renderGame() {
   const isMyTurn = trickExpected === mySeatLocal;
   const isBidTurn = biddingTurn === mySeatLocal;
 
-  // Compute legal plays
   let legalIds = new Set();
-  if (g.phase === "playing" && isMyTurn) {
-    // We let the server enforce legality; just enable all cards when it's your turn
-    // (server will reject illegal moves with an error message)
-    myHand.forEach(c => legalIds.add(c.id));
-  }
+  if (g.phase === "playing" && isMyTurn) myHand.forEach(c => legalIds.add(c.id));
 
-  // ── BOARD HTML ──
   const partnerSeat = (mySeatLocal + 2) % 4;
   const rightSeat = (mySeatLocal + 1) % 4;
   const leftSeat = (mySeatLocal + 3) % 4;
@@ -288,15 +323,14 @@ function renderGame() {
   function oppHtml(seat, extraCls) {
     const p = g.players[seat];
     const isActive = biddingTurn === seat || trickExpected === seat;
-    const cards = g.hands[seat] || [];
-    const count = cards.length;
+    const count = (g.hands[seat] || []).length;
     const isDisconn = p && !p.connected;
     let backs = "";
     for (let i = 0; i < Math.min(count, 8); i++) backs += '<div class="pv-cardback"></div>';
     return (
-      '<div class="pv-opp' + (extraCls ? ' ' + extraCls : '') + '">' +
+      '<div class="pv-opp' + (extraCls ? ' '+extraCls : '') + '">' +
         '<div class="pv-opp-label' + (isActive ? ' active' : '') + (isDisconn ? ' disconnected' : '') + '">' +
-          esc(p ? p.name : 'Waiting...') + (isDisconn ? ' ⚡' : '') +
+          esc(p ? p.name : '...') + (isDisconn ? ' ⚡' : '') +
         '</div>' +
         '<div class="pv-cardback-row">' + backs + '</div>' +
         '<div class="pv-opp-info">' + count + ' cards</div>' +
@@ -309,34 +343,25 @@ function renderGame() {
     trickHtml += '<div class="trump-badge">' + suitSVG(g.trumpSuit) + '<div class="label">' + SUIT_LABEL[g.trumpSuit] + ' trump</div></div>';
   }
   for (const entry of (g.trick || [])) {
-    const vis = visualSeat(entry.seat, mySeatLocal);
-    const posClass = TRICK_POS_MAP[vis];
-    trickHtml += '<div class="trick-card-pos ' + posClass + '">' + cardHtmlStr(entry.card, { played: true, isTrump: entry.card.suit === g.trumpSuit }) + '</div>';
+    const vis = (entry.seat - mySeatLocal + 4) % 4;
+    trickHtml += '<div class="trick-card-pos ' + TRICK_POS_MAP[vis] + '">' + cardHtmlStr(entry.card, { played: true, isTrump: entry.card.suit === g.trumpSuit }) + '</div>';
   }
   trickHtml += '</div>';
 
   let handHtml = "";
   for (const card of myHand) {
     const clickable = legalIds.has(card.id);
-    handHtml += cardHtmlStr(card, {
-      clickable,
-      disabled: g.phase === "playing" && isMyTurn && !clickable,
-      isTrump: card.suit === g.trumpSuit,
-      seat: mySeatLocal,
-    });
+    handHtml += cardHtmlStr(card, { clickable, disabled: g.phase === "playing" && isMyTurn && !clickable, isTrump: card.suit === g.trumpSuit, seat: mySeatLocal });
   }
 
+  const myTeamLabel = mySeatLocal % 2 === 0 ? "Team A" : "Team B";
   const boardHtml =
     '<div class="pv-board">' +
       '<div class="pv-top-row">' + oppHtml(partnerSeat) + '</div>' +
-      '<div class="pv-middle">' +
-        oppHtml(leftSeat, "pv-side-opp") +
-        trickHtml +
-        oppHtml(rightSeat, "pv-side-opp") +
-      '</div>' +
+      '<div class="pv-middle">' + oppHtml(leftSeat, "pv-side-opp") + trickHtml + oppHtml(rightSeat, "pv-side-opp") + '</div>' +
       '<div class="pv-hand-zone">' +
         '<div class="pv-you-label' + (isMyTurn || isBidTurn ? ' your-turn' : '') + '">' +
-          esc(g.players[mySeatLocal] ? g.players[mySeatLocal].name : 'You') +
+          esc(g.players[mySeatLocal]?.name || 'You') + ' (' + myTeamLabel + ')' +
           (isMyTurn ? ' — your turn' : '') + (isBidTurn ? ' — bid' : '') +
         '</div>' +
         '<div class="pv-hand-grid">' + handHtml + '</div>' +
@@ -344,34 +369,35 @@ function renderGame() {
     '</div>';
 
   // ── SIDEBAR ──
-  const me = g.players[mySeatLocal];
-  const myTeam = mySeatLocal % 2;
-  let sidebarHtml = "";
-
-  // Scores
+  let sidebarHtml = '<div class="panels-row">';
   sidebarHtml +=
     '<div class="panel"><h3>Score</h3>' +
-    '<div class="score-row"><span>South / North</span><span class="val">' + g.teamScores[0] + '</span></div>' +
-    '<div class="score-row"><span>West / East</span><span class="val">' + g.teamScores[1] + '</span></div>' +
-    '<div style="font-size:11px;opacity:0.55;margin-top:5px;">First to 1000 wins.</div>' +
+    '<div class="score-row"><span class="team-a-label">Team A</span><span class="val">' + g.teamScores[0] + '</span></div>' +
+    '<div class="score-row"><span class="team-b-label">Team B</span><span class="val">' + g.teamScores[1] + '</span></div>' +
+    '<div style="font-size:10px;opacity:0.55;margin-top:4px;">First to 1000 wins.</div>' +
     '</div>';
 
-  // Phase-specific panels
+  if (g.phase === "playing" && g.trumpSuit) {
+    sidebarHtml += '<div class="panel"><h3>Trump</h3>' +
+      '<div style="display:flex;align-items:center;gap:6px;font-size:13px;">' + suitSVG(g.trumpSuit) + SUIT_LABEL[g.trumpSuit] + '</div>' +
+      '<div style="font-size:11px;opacity:0.6;margin-top:4px;">Called by ' + esc(g.players[g.callerSeat]?.name || '?') + '</div>' +
+      '<div style="font-size:11px;opacity:0.6;">Tricks: ' + (g.tricksWon||0) + '/8</div>' +
+      '</div>';
+  }
+  sidebarHtml += '</div>';
+
   if (g.phase === "bidding") {
     const isForced = g.passes && g.passes.length === 3;
     sidebarHtml += '<div class="panel"><h3>Bidding</h3>' +
-      '<div style="font-size:13px;margin-bottom:8px;">' +
-        (isBidTurn
-          ? (isForced ? '<b>You must call a suit.</b>' : '<b>Your turn to call or pass.</b>')
-          : 'Waiting for ' + esc(g.players[biddingTurn] ? g.players[biddingTurn].name : '...') + '...') +
+      '<div style="font-size:13px;margin-bottom:6px;">' +
+        (isBidTurn ? (isForced ? '<b>You must call a suit.</b>' : '<b>Your turn — call or pass.</b>')
+          : 'Waiting for ' + esc(g.players[biddingTurn]?.name || '...') + '...') +
       '</div>';
     if (isBidTurn) {
       sidebarHtml += '<div class="suit-pick-row">' +
         SUITS.map(s => '<div class="suit-btn" onclick="send({type:\'call\',suit:\'' + s + '\'})">' + suitSVG(s) + esc(SUIT_LABEL[s]) + '</div>').join("") +
         '</div>';
-      if (!isForced) {
-        sidebarHtml += '<div style="margin-top:10px;"><button class="btn secondary" onclick="send({type:\'pass\'})">Pass (reveal last 2 cards)</button></div>';
-      }
+      if (!isForced) sidebarHtml += '<button class="btn secondary" onclick="send({type:\'pass\'})">Pass (reveal last 2 cards)</button>';
     }
     sidebarHtml += '</div>';
   }
@@ -385,66 +411,60 @@ function renderGame() {
       const hidden = meldsBySeat[s].filter(m => m.hidden);
       if (!visible.length && !hidden.length) continue;
       anyMelds = true;
-      const p = g.players[s];
-      meldContent += '<div style="font-size:11px;opacity:0.7;margin-top:4px;">' + esc(p ? p.name : 'Seat '+(s+1)) + '</div>';
+      meldContent += '<div style="font-size:11px;opacity:0.7;margin-top:4px;">' + esc(g.players[s]?.name || 'Seat '+(s+1)) + '</div>';
       for (const m of visible) {
-        meldContent += '<div class="meld-item"><span>' + esc(m.type) + ' (' + m.cards.map(c=>c.rank||'?').join('-') + (m.suit ? ' '+SUIT_LABEL[m.suit] : '') + ')</span><span>' + m.value + '</span></div>';
+        meldContent += '<div class="meld-item"><span>' + esc(m.type) + ' (' + m.cards.map(c=>c.rank||'?').join('-') + (m.suit?' '+SUIT_LABEL[m.suit]:'') + ')</span><span>' + m.value + '</span></div>';
       }
-      for (const m of hidden) {
-        if (s === mySeatLocal) {
+      if (s === mySeatLocal) {
+        for (const m of hidden) {
           meldContent += '<div class="meld-item" style="opacity:0.7;"><span>Bella (hidden)</span><span>' + m.value + '</span></div>';
         }
       }
     }
     if (!anyMelds) meldContent = '<div class="empty-note">No melds this hand.</div>';
-
-    // Check if already confirmed
-    const confirmBtn = '<button class="btn" onclick="send({type:\'confirm_melds\'})">Confirm &amp; start play</button>';
-    sidebarHtml += '<div class="panel"><h3>Melds</h3>' + meldContent + '<div style="margin-top:10px;">' + confirmBtn + '</div></div>';
-  }
-
-  if (g.phase === "playing" && g.trumpSuit) {
-    sidebarHtml += '<div class="panel"><h3>Trump</h3>' +
-      '<div style="display:flex;align-items:center;gap:8px;font-size:13px;">' + suitSVG(g.trumpSuit) + SUIT_LABEL[g.trumpSuit] + ' — called by ' + esc(g.players[g.callerSeat] ? g.players[g.callerSeat].name : '?') + '</div>' +
-      '<div style="font-size:11px;opacity:0.6;margin-top:5px;">Tricks: ' + (g.tricksWon||0) + ' / 8</div>' +
-      '</div>';
+    sidebarHtml += '<div class="panel"><h3>Melds</h3>' + meldContent +
+      '<button class="btn" onclick="send({type:\'confirm_melds\'})">Confirm &amp; start play</button></div>';
   }
 
   if (g.phase === "hand-end" || g.phase === "game-end") {
     const s = g.lastHandSummary;
-    let resultHtml = s ? (
-      '<div style="font-size:13px;line-height:1.6;">' +
-      '<div>Pot: <b>' + s.pot + '</b> pts</div>' +
-      (s.capot ? '<div style="color:var(--brass);">Capot — full sweep!</div>' : '') +
-      (s.set ? '<div style="color:var(--brass);">Caller was set.</div>' : '') +
-      '<div>S/N: +' + s.scores[0] + '  W/E: +' + s.scores[1] + '</div>' +
-      '</div>'
-    ) : '';
+    let resultHtml = "";
+    if (s) {
+      if (s.instantWin) {
+        resultHtml = '<div style="font-size:13px;line-height:1.7;color:var(--brass);">🏆 Instant win! All 8 ' + esc(s.instantWinSuit) + ' in one hand!</div>';
+      } else {
+        resultHtml = '<div style="font-size:13px;line-height:1.7;">' +
+          '<div>Pot: <b>' + s.pot + '</b> pts</div>' +
+          (s.capot ? '<div style="color:var(--brass);">Capot — full sweep!</div>' : '') +
+          (s.set ? '<div style="color:var(--brass);">Caller was set.</div>' : '') +
+          '<div>A: +' + s.scores[0] + ' &nbsp; B: +' + s.scores[1] + '</div>' +
+          '</div>';
+      }
+    }
     sidebarHtml += '<div class="panel"><h3>Hand Result</h3>' + resultHtml;
     if (g.phase === "hand-end") {
-      sidebarHtml += '<button class="btn" style="margin-top:10px;" onclick="send({type:\'next_hand\'})">Ready for next hand</button>';
-      sidebarHtml += '<div class="waiting-confirm">Waiting for all players to confirm...</div>';
+      sidebarHtml += '<button class="btn" onclick="send({type:\'next_hand\'})">Ready for next hand</button>';
+      sidebarHtml += '<div class="waiting-confirm">Waiting for all players...</div>';
     } else {
-      const winner = g.teamScores[0] >= 1000 ? "South/North win!" : "West/East win!";
-      sidebarHtml += '<div style="font-size:17px;color:var(--brass);margin:8px 0;">' + winner + '</div>';
+      const winner = g.teamScores[0] > g.teamScores[1] ? "Team A wins! 🏆" : "Team B wins! 🏆";
+      sidebarHtml += '<div style="font-size:16px;color:var(--brass);margin:8px 0;text-align:center;">' + winner + '</div>';
       sidebarHtml += '<button class="btn" onclick="send({type:\'new_game\'})">Vote for new game</button>';
       sidebarHtml += '<div class="waiting-confirm">All 4 players must vote.</div>';
     }
     sidebarHtml += '</div>';
   }
 
-  // Log
   let logHtml = "";
   const log = g.log || [];
   for (let i = log.length-1; i >= 0; i--) {
     logHtml += '<div class="entry' + (log[i].notice ? ' notice' : '') + '">' + esc(log[i].msg) + '</div>';
   }
-  sidebarHtml += '<div class="panel" style="flex:1;display:flex;flex-direction:column;min-height:0;"><h3>Table Log</h3><div class="log">' + logHtml + '</div></div>';
+  sidebarHtml += '<div class="panel"><h3>Table Log</h3><div class="log">' + logHtml + '</div></div>';
 
   document.getElementById("root").innerHTML =
     '<div class="app">' +
       '<div class="table-wrap">' +
-        '<div class="titlebar"><h1>Bella</h1><div class="sub">Hand ' + (g.handNum||1) + ' · Room ' + esc(myRoomCode||'') + '</div></div>' +
+        '<div class="titlebar"><h1>Bella</h1><div class="sub">Hand ' + (g.handNum||1) + ' · ' + esc(myRoomCode||'') + '</div></div>' +
         boardHtml +
       '</div>' +
       '<div class="sidebar">' + sidebarHtml + '</div>' +
@@ -462,9 +482,8 @@ function cardHtmlStr(card, opts) {
   const pc = opts.played ? " played" : "";
   const tc = opts.isTrump ? " trump-card" : "";
   return (
-    '<div class="card suit-' + card.suit + dc + pc + tc + '" data-card-id="' + card.id + '" data-clickable="' + (opts.clickable ? "1" : "0") + '" title="' + card.rank + ' of ' + SUIT_LABEL[card.suit] + '">' +
-      '<div class="rank">' + esc(card.rank) + '</div>' +
-      suitSVG(card.suit) +
+    '<div class="card suit-' + card.suit + dc + pc + tc + '" data-card-id="' + card.id + '" data-clickable="' + (opts.clickable?"1":"0") + '">' +
+      '<div class="rank">' + esc(card.rank) + '</div>' + suitSVG(card.suit) +
     '</div>'
   );
 }
@@ -475,7 +494,6 @@ function attachCardHandlers() {
   });
 }
 
-// ── INIT ──
 renderLobby();
 </script>
 </body>

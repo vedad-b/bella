@@ -8,7 +8,7 @@ const WebSocket = require("./node_modules/ws");
 const PORT = process.env.PORT || 3000;
 
 // ============================================================
-// ENGINE (same rules as client, server is authoritative)
+// ENGINE
 // ============================================================
 const SUITS = ["hearts", "bells", "acorns", "leaves"];
 const RANKS = ["7", "8", "9", "10", "J", "Q", "K", "A"];
@@ -52,8 +52,7 @@ function dealInitial(deck) {
   return { hands, kitty };
 }
 function nextSeat(seat) { return (seat + 1) % 4; }
-function partnerOf(seat) { return (seat + 2) % 4; }
-function teamOf(seat) { return seat % 2; }
+function teamOf(seat) { return seat % 2; } // seats 0,2 = team 0 (A); seats 1,3 = team 1 (B)
 
 function currentWinningCard(trick, trumpSuit) {
   const ledSuit = trick[0].card.suit;
@@ -145,7 +144,7 @@ function resolveMelds(meldsBySeat, callerSeat) {
   const bestPerSeat = visible.map(list => list.length === 0 ? null : list.reduce((b,m) => compareMelds(m,b)>0?m:b));
   const teamBest = [null, null];
   for (let t = 0; t < 2; t++) {
-    for (const seat of [t===0?0:1, t===0?2:3]) {
+    for (const seat of (t===0 ? [0,2] : [1,3])) {
       const m = bestPerSeat[seat];
       if (!m) continue;
       if (!teamBest[t] || compareMelds(m, teamBest[t].meld) > 0) teamBest[t] = { meld: m, seat };
@@ -198,10 +197,23 @@ function scoreHand({ trickPointsByTeam, capotTeam, callerTeam, meldResult }) {
   }
 }
 
+// Check if any single player holds all 8 cards of any suit
+// Returns { seat, suit } if found, null otherwise
+function checkEightCardSuit(hands) {
+  for (let seat = 0; seat < 4; seat++) {
+    for (const suit of SUITS) {
+      const count = hands[seat].filter(c => c.suit === suit).length;
+      if (count === 8) return { seat, suit };
+    }
+  }
+  return null;
+}
+
 // ============================================================
 // ROOM MANAGEMENT
+// Seats 0,2 = Team A (partners); Seats 1,3 = Team B (partners)
 // ============================================================
-const rooms = new Map(); // roomCode -> Room
+const rooms = new Map();
 
 function generateRoomCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -214,7 +226,7 @@ function generateRoomCode() {
 function createRoom(code) {
   const room = {
     code,
-    players: [null, null, null, null], // seat -> { ws, name, connected }
+    players: [null, null, null, null], // indexed by seat (0=A1, 1=B1, 2=A2, 3=B2)
     game: null,
     handNum: 0,
     teamScores: [0, 0],
@@ -224,12 +236,22 @@ function createRoom(code) {
   return room;
 }
 
-function roomSeatCount(room) {
-  return room.players.filter(p => p !== null).length;
+function teamCount(room, team) {
+  const seats = team === "A" ? [0, 2] : [1, 3];
+  return seats.filter(s => room.players[s] !== null).length;
 }
 
-function findEmptySeat(room) {
-  return room.players.findIndex(p => p === null);
+function findEmptySeatOnTeam(room, team) {
+  const seats = team === "A" ? [0, 2] : [1, 3];
+  return seats.find(s => room.players[s] === null);
+}
+
+function isReadyToStart(room) {
+  return teamCount(room, "A") === 2 && teamCount(room, "B") === 2;
+}
+
+function totalPlayers(room) {
+  return room.players.filter(p => p !== null).length;
 }
 
 // ============================================================
@@ -275,24 +297,34 @@ function playerName(room, seat) {
 // ============================================================
 // BROADCAST
 // ============================================================
-// Build what each seat should see — own hand visible, others hidden
 function buildStateForSeat(room, seat) {
   const g = room.game;
-  if (!g) return { phase: "lobby", teamScores: room.teamScores, players: room.players.map(p => p ? { name: p.name, connected: p.connected } : null) };
+  const playersInfo = room.players.map(p => p ? { name: p.name, connected: p.connected } : null);
+
+  if (!g) {
+    return {
+      phase: "lobby",
+      teamScores: room.teamScores,
+      players: playersInfo,
+      teamA: [
+        room.players[0] ? room.players[0].name : null,
+        room.players[2] ? room.players[2].name : null,
+      ],
+      teamB: [
+        room.players[1] ? room.players[1].name : null,
+        room.players[3] ? room.players[3].name : null,
+      ],
+    };
+  }
 
   const hands = g.hands.map((hand, s) => {
-    if (s === seat) return hand; // own hand: full cards
-    return hand.map(() => ({ id: "hidden", hidden: true })); // others: just count
+    if (s === seat) return hand;
+    return hand.map(() => ({ id: "hidden", hidden: true }));
   });
-
-  // Kitty: player sees their own unrevealed kitty only after passing
   const kitty = g.kitty.map((k, s) => {
     if (g.revealedKitty[s] && s === seat) return k;
     return k.map(() => ({ id: "hidden", hidden: true }));
   });
-
-  // Melds: visible melds are shown to everyone (they're declared face-up).
-  // Hidden (bella) melds are only visible to the holder.
   const meldsBySeat = g.meldsBySeat.map((list, s) =>
     list.map(m => (m.hidden && s !== seat) ? { ...m, cards: m.cards.map(() => ({ id: "hidden", hidden: true })) } : m)
   );
@@ -302,7 +334,15 @@ function buildStateForSeat(room, seat) {
     dealer: g.dealer,
     handNum: room.handNum,
     teamScores: room.teamScores,
-    players: room.players.map(p => p ? { name: p.name, connected: p.connected } : null),
+    players: playersInfo,
+    teamA: [
+      room.players[0] ? room.players[0].name : null,
+      room.players[2] ? room.players[2].name : null,
+    ],
+    teamB: [
+      room.players[1] ? room.players[1].name : null,
+      room.players[3] ? room.players[3].name : null,
+    ],
     mySeat: seat,
     hands,
     kitty,
@@ -367,20 +407,32 @@ function handleCall(room, seat, suit) {
 function handleConfirmMelds(room, seat) {
   const g = room.game;
   if (g.phase !== "melds") return "Not in meld phase.";
-  // All players must confirm — track confirmations
   if (!g.meldConfirms) g.meldConfirms = new Set();
   g.meldConfirms.add(seat);
   if (g.meldConfirms.size < 4) {
     addLog(room, `${playerName(room, seat)} confirms melds (${g.meldConfirms.size}/4).`);
     return null;
   }
-  // All confirmed
+
+  // Check 8-card suit instant win before proceeding
+  const eightCard = checkEightCardSuit(g.hands);
+  if (eightCard) {
+    const winnerTeam = teamOf(eightCard.seat);
+    const winnerName = playerName(room, eightCard.seat);
+    addLog(room, `${winnerName} holds all 8 ${eightCard.suit}! Instant game win!`, true);
+    room.teamScores[winnerTeam] = WINNING_SCORE + 1; // force over threshold
+    g.lastHandSummary = { pot: 0, scores: winnerTeam === 0 ? [WINNING_SCORE+1, room.teamScores[1]] : [room.teamScores[0], WINNING_SCORE+1], set: false, capot: false, instantWin: true, instantWinSuit: eightCard.suit, instantWinSeat: eightCard.seat };
+    g.phase = "game-end";
+    g.meldConfirms = null;
+    return null;
+  }
+
   const meldResult = resolveMelds(g.meldsBySeat, g.callerSeat);
   g.meldResult = meldResult;
   if (meldResult.winningTeam === null) {
     addLog(room, "No melds on the table.");
   } else {
-    const label = meldResult.winningTeam === 0 ? "South/North" : "West/East";
+    const label = meldResult.winningTeam === 0 ? "Team A" : "Team B";
     addLog(room, `${label} win the meld comparison: +${meldResult.totalAwarded} pts.`, true);
   }
   g.phase = "playing";
@@ -406,7 +458,6 @@ function handlePlayCard(room, seat, cardId) {
 
   if (g.trick.length < 4) return null;
 
-  // Trick complete
   const result = resolveTrick(g.trick, g.trumpSuit);
   g.tricksWon.push({ seat: result.winnerSeat, points: result.points });
   addLog(room, `${playerName(room, result.winnerSeat)} wins the trick (+${result.points} pts).`, true);
@@ -426,8 +477,8 @@ function handlePlayCard(room, seat, cardId) {
     g.lastHandSummary = { ...scoreResult, trickPointsByTeam, capotTeam };
     addLog(room, `Hand complete. Pot: ${scoreResult.pot} pts.`, true);
     if (scoreResult.capot) addLog(room, "CAPOT! Full sweep.", true);
-    else if (scoreResult.set) addLog(room, `${callerTeam===0?"South/North":"West/East"} were SET — opponents take all.`, true);
-    addLog(room, `South/North +${scoreResult.scores[0]}, West/East +${scoreResult.scores[1]}.`, true);
+    else if (scoreResult.set) addLog(room, `${callerTeam===0?"Team A":"Team B"} were SET — opponents take all.`, true);
+    addLog(room, `Team A +${scoreResult.scores[0]}, Team B +${scoreResult.scores[1]}.`, true);
     const gameOver = room.teamScores[0] >= WINNING_SCORE || room.teamScores[1] >= WINNING_SCORE;
     g.phase = gameOver ? "game-end" : "hand-end";
     g.trick = [];
@@ -468,7 +519,7 @@ function handleNewGame(room, seat) {
 }
 
 // ============================================================
-// HTTP SERVER — serve the client HTML
+// HTTP SERVER
 // ============================================================
 const httpServer = http.createServer((req, res) => {
   if (req.url === "/" || req.url === "/index.html") {
@@ -479,8 +530,7 @@ const httpServer = http.createServer((req, res) => {
       res.end(data);
     });
   } else {
-    res.writeHead(404);
-    res.end("Not found");
+    res.writeHead(404); res.end("Not found");
   }
 });
 
@@ -497,29 +547,38 @@ wss.on("connection", (ws) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // ---- JOIN or CREATE ----
+    // ---- CREATE ROOM (no team yet, just gets a code) ----
+    if (msg.type === "create") {
+      const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
+      const code = generateRoomCode();
+      const room = createRoom(code);
+      // Creator doesn't sit yet — they pick a team next
+      ws.send(JSON.stringify({ type: "created", roomCode: code, name }));
+      return;
+    }
+
+    // ---- JOIN ROOM + PICK TEAM ----
     if (msg.type === "join") {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
-      let room;
-      if (msg.code) {
-        const code = msg.code.toUpperCase().trim();
-        room = rooms.get(code);
-        if (!room) { sendError(ws, "Room not found. Check the code and try again."); return; }
-        if (roomSeatCount(room) >= 4) { sendError(ws, "Room is full (4 players)."); return; }
-      } else {
-        const code = generateRoomCode();
-        room = createRoom(code);
-      }
-      const seat = findEmptySeat(room);
+      const code = (msg.code || "").toUpperCase().trim();
+      const team = msg.team; // "A" or "B"
+
+      let room = rooms.get(code);
+      if (!room) { sendError(ws, "Room not found. Check the code and try again."); return; }
+      if (!["A","B"].includes(team)) { sendError(ws, "Pick a team (A or B)."); return; }
+      if (teamCount(room, team) >= 2) { sendError(ws, `Team ${team} is full (2 players max).`); return; }
+      if (totalPlayers(room) >= 4) { sendError(ws, "Room is full."); return; }
+
+      const seat = findEmptySeatOnTeam(room, team);
       room.players[seat] = { ws, name, connected: true };
       playerRoom = room;
       playerSeat = seat;
 
-      ws.send(JSON.stringify({ type: "joined", roomCode: room.code, seat, name }));
-      addLog(room, `${name} joined (seat ${seat + 1}).`);
+      ws.send(JSON.stringify({ type: "joined", roomCode: code, seat, name, team }));
+      addLog(room, `${name} joined Team ${team}.`);
 
-      if (roomSeatCount(room) === 4) {
-        addLog(room, "All 4 players connected. Starting first hand...", true);
+      if (isReadyToStart(room)) {
+        addLog(room, "Both teams ready. Starting first hand...", true);
         startHand(room);
       }
       broadcastAll(room);
@@ -528,7 +587,6 @@ wss.on("connection", (ws) => {
 
     if (!playerRoom) { sendError(ws, "Not in a room."); return; }
 
-    // ---- GAME ACTIONS ----
     const room = playerRoom;
     const seat = playerSeat;
     let err = null;
@@ -553,7 +611,6 @@ wss.on("connection", (ws) => {
       addLog(room, `${playerName(room, playerSeat)} disconnected.`);
       broadcastAll(room);
     }
-    // Clean up empty rooms after a delay
     setTimeout(() => {
       if (room.players.every(p => p === null || !p.connected)) {
         rooms.delete(room.code);
@@ -567,5 +624,4 @@ wss.on("connection", (ws) => {
 
 httpServer.listen(PORT, () => {
   console.log(`Bella server running on http://localhost:${PORT}`);
-  console.log(`Share this address with your friends to play.`);
 });
