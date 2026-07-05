@@ -266,6 +266,7 @@ function onMessage(event) {
     pendingRoomCode = msg.roomCode;
     myRoomCode = msg.roomCode;
     renderTeamPicker(msg.roomCode, [null, null], [null, null], "");
+    // Server will follow up with a state update containing live team data
   } else if (msg.type === "joined") {
     mySeat = msg.seat;
     myTeam = msg.team;
@@ -276,7 +277,9 @@ function onMessage(event) {
     const teamA = gameState.teamA || [null, null];
     const teamB = gameState.teamB || [null, null];
     const bothTeamsReady = teamA.filter(Boolean).length === 2 && teamB.filter(Boolean).length === 2;
-    if (!bothTeamsReady || gameState.phase === "lobby") {
+    if (!bothTeamsReady) {
+      renderTeamPicker(myRoomCode, teamA, teamB, "");
+    } else if (gameState.phase === "lobby") {
       renderTeamPicker(myRoomCode, teamA, teamB, "");
     } else {
       renderGame();
