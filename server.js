@@ -227,6 +227,7 @@ function createRoom(code) {
   const room = {
     code,
     players: [null, null, null, null], // indexed by seat (0=A1, 1=B1, 2=A2, 3=B2)
+    pending: [], // unseated connections waiting to pick a team
     game: null,
     handNum: 0,
     teamScores: [0, 0],
@@ -361,11 +362,28 @@ function buildStateForSeat(room, seat) {
   };
 }
 
+function lobbyStateForPending(room) {
+  return {
+    phase: "lobby",
+    teamScores: room.teamScores,
+    players: room.players.map(p => p ? { name: p.name, connected: p.connected } : null),
+    teamA: [room.players[0]?.name||null, room.players[2]?.name||null],
+    teamB: [room.players[1]?.name||null, room.players[3]?.name||null],
+  };
+}
+
 function broadcastAll(room) {
   for (let seat = 0; seat < 4; seat++) {
     const p = room.players[seat];
     if (p && p.ws && p.ws.readyState === WebSocket.OPEN) {
       p.ws.send(JSON.stringify({ type: "state", state: buildStateForSeat(room, seat) }));
+    }
+  }
+  // Also push lobby state to unseated (pending) connections so they see team updates
+  const lobbyState = lobbyStateForPending(room);
+  for (const pws of (room.pending || [])) {
+    if (pws.readyState === WebSocket.OPEN) {
+      pws.send(JSON.stringify({ type: "state", state: lobbyState }));
     }
   }
 }
@@ -476,8 +494,16 @@ function handlePlayCard(room, seat, cardId) {
     g.tricksWon = finalTricks;
     g.lastHandSummary = { ...scoreResult, trickPointsByTeam, capotTeam };
     addLog(room, `Hand complete. Pot: ${scoreResult.pot} pts.`, true);
-    if (scoreResult.capot) addLog(room, "CAPOT! Full sweep.", true);
-    else if (scoreResult.set) addLog(room, `${callerTeam===0?"Team A":"Team B"} were SET — opponents take all.`, true);
+    if (scoreResult.capot) {
+      addLog(room, 'CAPOT! Full sweep.', true);
+    } else if (scoreResult.set) {
+      const callerLabel = callerTeam === 0 ? 'Team A' : 'Team B';
+      const otherLabel  = callerTeam === 0 ? 'Team B' : 'Team A';
+      const callerPts = trickPointsByTeam[callerTeam];
+      const otherPts  = trickPointsByTeam[callerTeam === 0 ? 1 : 0];
+      addLog(room, `Card points — ${callerLabel}: ${callerPts}, ${otherLabel}: ${otherPts}.`);
+      addLog(room, `${callerLabel} needed >${Math.floor(scoreResult.pot/2)} but only had ${callerPts} — SET. ${otherLabel} takes all ${scoreResult.pot} pts.`, true);
+    }
     addLog(room, `Team A +${scoreResult.scores[0]}, Team B +${scoreResult.scores[1]}.`, true);
     const gameOver = room.teamScores[0] >= WINNING_SCORE || room.teamScores[1] >= WINNING_SCORE;
     g.phase = gameOver ? "game-end" : "hand-end";
@@ -552,8 +578,12 @@ wss.on("connection", (ws) => {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = generateRoomCode();
       const room = createRoom(code);
-      // Creator doesn't sit yet — they pick a team next
+      // Store room ref on ws so disconnect cleanup works before they pick a team
+      ws._pendingRoom = room;
+      room.pending.push(ws);
       ws.send(JSON.stringify({ type: "created", roomCode: code, name }));
+      // Also send a state so client has live lobby data right away
+      broadcastAll(room);
       return;
     }
 
@@ -573,6 +603,8 @@ wss.on("connection", (ws) => {
       room.players[seat] = { ws, name, connected: true };
       playerRoom = room;
       playerSeat = seat;
+      // Remove from pending list now that they have a seat
+      room.pending = (room.pending || []).filter(p => p !== ws);
 
       ws.send(JSON.stringify({ type: "joined", roomCode: code, seat, name, team }));
       addLog(room, `${name} joined Team ${team}.`);
@@ -604,8 +636,13 @@ wss.on("connection", (ws) => {
   });
 
   ws.on("close", () => {
+    if (!playerRoom && ws._pendingRoom) {
+      ws._pendingRoom.pending = ws._pendingRoom.pending.filter(p => p !== ws);
+      return;
+    }
     if (!playerRoom) return;
     const room = playerRoom;
+    room.pending = (room.pending || []).filter(p => p !== ws);
     if (room.players[playerSeat]) {
       room.players[playerSeat].connected = false;
       addLog(room, `${playerName(room, playerSeat)} disconnected.`);
