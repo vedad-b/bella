@@ -535,10 +535,6 @@ function handleNewGame(room, seat) {
   return null;
 }
 
-function sendError(ws, msg) {
-  ws.send(JSON.stringify({ type: "error", msg }));
-}
-
 // ============================================================
 // HTTP SERVER
 // ============================================================
@@ -593,15 +589,25 @@ wss.on("connection", (ws) => {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = (msg.code || "").toUpperCase().trim();
       const team = msg.team;
+      const sessionId = msg.sessionId;
 
       let room = rooms.get(code);
       if (!room) { sendError(ws, "Room not found. Check the code and try again."); return; }
+      
+      // Lock Check: Verify if this session ID is already seated somewhere in the room
+      const alreadySeated = room.players.some(p => p && p.sessionId === sessionId);
+      if (alreadySeated) {
+        sendError(ws, "You have already joined a team in this room!");
+        return;
+      }
+
       if (!["A","B"].includes(team)) { sendError(ws, "Pick a team (A or B)."); return; }
       if (teamCount(room, team) >= 2) { sendError(ws, `Team ${team} is full (2 players max).`); return; }
       if (totalPlayers(room) >= 4) { sendError(ws, "Room is full."); return; }
 
       const seat = findEmptySeatOnTeam(room, team);
-      room.players[seat] = { ws, name, connected: true };
+      // Save sessionId alongside connection tracking
+      room.players[seat] = { ws, name, sessionId, connected: true };
       playerRoom = room;
       playerSeat = seat;
       room.pending = (room.pending || []).filter(p => p !== ws);

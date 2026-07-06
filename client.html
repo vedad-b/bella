@@ -167,6 +167,13 @@ function sortHand(hand, trumpSuit) {
   });
 }
 
+// Get or create unique session ID for the browser client
+let mySessionId = localStorage.getItem("bella_session_id");
+if (!mySessionId) {
+  mySessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  localStorage.setItem("bella_session_id", mySessionId);
+}
+
 let ws = null;
 let myName = "";
 let mySeat = null;
@@ -222,7 +229,7 @@ function doCreate() {
   const name = (document.getElementById("name-input")?.value || "").trim();
   if (!name) { renderLobby("Enter your name first."); return; }
   myName = name;
-  connectAndSend({ type: "create", name });
+  connectAndSend({ type: "create", name, sessionId: mySessionId });
 }
 
 function doJoinWithCode() {
@@ -240,7 +247,7 @@ function doJoinWithCode() {
 function doJoinTeam(team) {
   const code = pendingRoomCode || myRoomCode;
   if (!code) return;
-  send({ type: "join", name: myName, code, team });
+  send({ type: "join", name: myName, code, team, sessionId: mySessionId });
 }
 
 function connectAndSend(msg) {
