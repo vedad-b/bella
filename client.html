@@ -46,7 +46,6 @@
   /* ── LAYOUT ── */
   .app { display: flex; flex-direction: column; min-height: 100vh; }
   .table-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-  .table-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
   .titlebar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
   .titlebar h1 { font-family: Georgia, serif; font-size: 22px; margin: 0; color: var(--brass); }
   .titlebar .sub { font-size: 11px; opacity: 0.6; letter-spacing: 1px; text-transform: uppercase; }
@@ -196,8 +195,6 @@ function renderLobby(error) {
 function renderTeamPicker(code, teamA, teamB, error) {
   const aFull = teamA.filter(Boolean).length >= 2;
   const bFull = teamB.filter(Boolean).length >= 2;
-  
-  // CRITICAL FIX: If this tab has already chosen a team, block further actions
   const alreadyPicked = (myTeam !== null);
 
   const memberHtml = (members) => members.map((m, i) =>
@@ -239,7 +236,7 @@ function doJoinWithCode() {
   pendingRoomCode = code;
   myRoomCode = code;
   renderTeamPicker(code, [null, null], [null, null], "");
-  connectAndSend({ type: "register_pending", code: code });
+  connectAndSend({ type: "register_pending", code: code, name: name }); // Added name to pending check
 }
 
 function doJoinTeam(team) {
@@ -278,6 +275,13 @@ function onMessage(event) {
     pendingRoomCode = msg.roomCode;
   } else if (msg.type === "state") {
     gameState = msg.state;
+    
+    // Automatically inherit local seat positions upon incoming state synchronization
+    if (gameState.mySeat !== undefined) {
+      mySeat = gameState.mySeat;
+      myTeam = (gameState.mySeat % 2 === 0) ? "A" : "B";
+    }
+
     const teamA = gameState.teamA || [null, null];
     const teamB = gameState.teamB || [null, null];
     const bothTeamsReady = teamA.filter(Boolean).length === 2 && teamB.filter(Boolean).length === 2;
@@ -290,6 +294,10 @@ function onMessage(event) {
     }
   } else if (msg.type === "error") {
     showError(msg.msg);
+    // If we get kicked back due to taken name on simple registration entry
+    if (msg.msg.includes("already taken")) {
+      renderLobby(msg.msg);
+    }
   }
 }
 
