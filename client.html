@@ -173,9 +173,8 @@ let mySeat = null;
 let myTeam = null;
 let myRoomCode = null;
 let gameState = null;
-let pendingRoomCode = null; // code created, waiting for team pick
+let pendingRoomCode = null;
 
-// ── LOBBY SCREENS ──
 function renderLobby(error) {
   document.getElementById("root").innerHTML =
     '<div class="lobby"><div class="lobby-card">' +
@@ -233,8 +232,9 @@ function doJoinWithCode() {
   if (code.length !== 4) { renderLobby("Enter the 4-letter room code."); return; }
   myName = name;
   pendingRoomCode = code;
+  myRoomCode = code;
   renderTeamPicker(code, [null, null], [null, null], "");
-  connectAndSend(null); // just connect, team pick sends the actual join
+  connectAndSend({ type: "register_pending", code: code });
 }
 
 function doJoinTeam(team) {
@@ -266,7 +266,6 @@ function onMessage(event) {
     pendingRoomCode = msg.roomCode;
     myRoomCode = msg.roomCode;
     renderTeamPicker(msg.roomCode, [null, null], [null, null], "");
-    // Server will follow up with a state update containing live team data
   } else if (msg.type === "joined") {
     mySeat = msg.seat;
     myTeam = msg.team;
@@ -371,7 +370,6 @@ function renderGame() {
       '</div>' +
     '</div>';
 
-  // ── SIDEBAR ──
   let sidebarHtml = '<div class="panels-row">';
   sidebarHtml +=
     '<div class="panel"><h3>Score</h3>' +

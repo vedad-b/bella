@@ -52,7 +52,7 @@ function dealInitial(deck) {
   return { hands, kitty };
 }
 function nextSeat(seat) { return (seat + 1) % 4; }
-function teamOf(seat) { return seat % 2; } // seats 0,2 = team 0 (A); seats 1,3 = team 1 (B)
+function teamOf(seat) { return seat % 2; }
 
 function currentWinningCard(trick, trumpSuit) {
   const ledSuit = trick[0].card.suit;
@@ -197,8 +197,6 @@ function scoreHand({ trickPointsByTeam, capotTeam, callerTeam, meldResult }) {
   }
 }
 
-// Check if any single player holds all 8 cards of any suit
-// Returns { seat, suit } if found, null otherwise
 function checkEightCardSuit(hands) {
   for (let seat = 0; seat < 4; seat++) {
     for (const suit of SUITS) {
@@ -211,7 +209,6 @@ function checkEightCardSuit(hands) {
 
 // ============================================================
 // ROOM MANAGEMENT
-// Seats 0,2 = Team A (partners); Seats 1,3 = Team B (partners)
 // ============================================================
 const rooms = new Map();
 
@@ -226,8 +223,8 @@ function generateRoomCode() {
 function createRoom(code) {
   const room = {
     code,
-    players: [null, null, null, null], // indexed by seat (0=A1, 1=B1, 2=A2, 3=B2)
-    pending: [], // unseated connections waiting to pick a team
+    players: [null, null, null, null],
+    pending: [],
     game: null,
     handNum: 0,
     teamScores: [0, 0],
@@ -379,17 +376,12 @@ function broadcastAll(room) {
       p.ws.send(JSON.stringify({ type: "state", state: buildStateForSeat(room, seat) }));
     }
   }
-  // Also push lobby state to unseated (pending) connections so they see team updates
   const lobbyState = lobbyStateForPending(room);
   for (const pws of (room.pending || [])) {
     if (pws.readyState === WebSocket.OPEN) {
       pws.send(JSON.stringify({ type: "state", state: lobbyState }));
     }
   }
-}
-
-function sendError(ws, msg) {
-  ws.send(JSON.stringify({ type: "error", msg }));
 }
 
 // ============================================================
@@ -432,13 +424,12 @@ function handleConfirmMelds(room, seat) {
     return null;
   }
 
-  // Check 8-card suit instant win before proceeding
   const eightCard = checkEightCardSuit(g.hands);
   if (eightCard) {
     const winnerTeam = teamOf(eightCard.seat);
     const winnerName = playerName(room, eightCard.seat);
     addLog(room, `${winnerName} holds all 8 ${eightCard.suit}! Instant game win!`, true);
-    room.teamScores[winnerTeam] = WINNING_SCORE + 1; // force over threshold
+    room.teamScores[winnerTeam] = WINNING_SCORE + 1;
     g.lastHandSummary = { pot: 0, scores: winnerTeam === 0 ? [WINNING_SCORE+1, room.teamScores[1]] : [room.teamScores[0], WINNING_SCORE+1], set: false, capot: false, instantWin: true, instantWinSuit: eightCard.suit, instantWinSeat: eightCard.seat };
     g.phase = "game-end";
     g.meldConfirms = null;
@@ -544,6 +535,10 @@ function handleNewGame(room, seat) {
   return null;
 }
 
+function sendError(ws, msg) {
+  ws.send(JSON.stringify({ type: "error", msg }));
+}
+
 // ============================================================
 // HTTP SERVER
 // ============================================================
@@ -573,25 +568,31 @@ wss.on("connection", (ws) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // ---- CREATE ROOM (no team yet, just gets a code) ----
     if (msg.type === "create") {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = generateRoomCode();
       const room = createRoom(code);
-      // Store room ref on ws so disconnect cleanup works before they pick a team
       ws._pendingRoom = room;
       room.pending.push(ws);
       ws.send(JSON.stringify({ type: "created", roomCode: code, name }));
-      // Also send a state so client has live lobby data right away
       broadcastAll(room);
       return;
     }
 
-    // ---- JOIN ROOM + PICK TEAM ----
+    if (msg.type === "register_pending") {
+      const code = (msg.code || "").toUpperCase().trim();
+      let room = rooms.get(code);
+      if (!room) { sendError(ws, "Room not found. Check the code."); return; }
+      ws._pendingRoom = room;
+      if (!room.pending.includes(ws)) room.pending.push(ws);
+      ws.send(JSON.stringify({ type: "state", state: lobbyStateForPending(room) }));
+      return;
+    }
+
     if (msg.type === "join") {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = (msg.code || "").toUpperCase().trim();
-      const team = msg.team; // "A" or "B"
+      const team = msg.team;
 
       let room = rooms.get(code);
       if (!room) { sendError(ws, "Room not found. Check the code and try again."); return; }
@@ -603,7 +604,6 @@ wss.on("connection", (ws) => {
       room.players[seat] = { ws, name, connected: true };
       playerRoom = room;
       playerSeat = seat;
-      // Remove from pending list now that they have a seat
       room.pending = (room.pending || []).filter(p => p !== ws);
 
       ws.send(JSON.stringify({ type: "joined", roomCode: code, seat, name, team }));
