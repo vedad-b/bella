@@ -236,9 +236,10 @@ function doJoinWithCode() {
   pendingRoomCode = code;
   myRoomCode = code;
   renderTeamPicker(code, [null, null], [null, null], "");
-  connectAndSend({ type: "register_pending", code: code, name: name }); // Added name to pending check
+  connectAndSend({ type: "register_pending", code: code, name: name });
 }
 
+// Partnership seat assignments routing map bindings
 function doJoinTeam(team) {
   const code = pendingRoomCode || myRoomCode;
   if (!code) return;
@@ -276,7 +277,6 @@ function onMessage(event) {
   } else if (msg.type === "state") {
     gameState = msg.state;
     
-    // Automatically inherit local seat positions upon incoming state synchronization
     if (gameState.mySeat !== undefined) {
       mySeat = gameState.mySeat;
       myTeam = (gameState.mySeat % 2 === 0) ? "A" : "B";
@@ -294,7 +294,6 @@ function onMessage(event) {
     }
   } else if (msg.type === "error") {
     showError(msg.msg);
-    // If we get kicked back due to taken name on simple registration entry
     if (msg.msg.includes("already taken")) {
       renderLobby(msg.msg);
     }

@@ -3,7 +3,7 @@
 const http = require("http");
 const path = require("path");
 const fs = require("fs");
-const WebSocket = require("./node_modules/ws");
+const WebSocket = require("ws");
 
 const PORT = process.env.PORT || 3000;
 
@@ -88,6 +88,7 @@ function legalPlays(hand, trick, trumpSuit) {
   return hand.slice();
 }
 
+// Ensure correct terminology: non-trump and trump indexing mappings evaluation
 function resolveTrick(trick, trumpSuit) {
   const winner = currentWinningCard(trick, trumpSuit);
   const points = trick.reduce((sum, t) => sum + cardPoints(t.card, trumpSuit), 0);
@@ -131,6 +132,7 @@ function meldsFromRun(runCards, suit) {
   if (len === 3) return [meldObj("tierce", suit, runCards, 20)];
   return [];
 }
+// Melds extraction configuration object mapper payload helpers
 function meldObj(type, suit, cards, value) {
   return { type, suit, cards, value, topRank: cards[cards.length-1].rank };
 }
@@ -536,17 +538,8 @@ function handleNewGame(room, seat) {
 }
 
 // ============================================================
-// WEBSOCKET SERVER
+// WEBSOCKET SERVER & HTTP ROUTING ARCHITECTURE
 // ============================================================
-const wss = new WebSocket.Server({ noServer: true });
-
-// Attach upgraded routing to native http server architecture below
-// ============================================================
-// CONTINUATION OF WEBSOCKET & HTTP ROUTING ARCHITECTURE
-// ============================================================
-
-const rooms = new Map();
-
 const wss = new WebSocket.Server({ noServer: true });
 
 wss.on("connection", (ws) => {
@@ -569,21 +562,19 @@ wss.on("connection", (ws) => {
       return;
     }
 
-    // ---- REGISTER PENDING CONNECTION TO LOBBY (WITH INTERCEPT RECONNECTION LOOKUP) ----
+    // ---- REGISTER PENDING CONNECTION TO LOBBY ----
     if (msg.type === "register_pending") {
       const code = (msg.code || "").toUpperCase().trim();
       const name = (msg.name || "").trim();
       let room = rooms.get(code);
       if (!room) { ws.send(JSON.stringify({ type: "error", msg: "Room not found." })); return; }
       
-      // RECONNECTION INTERCEPT POINT: Check if this name matches an isolated, disconnected seat
       const existingSeatIndex = room.players.findIndex(p => p && p.name.toLowerCase() === name.toLowerCase());
       
       if (existingSeatIndex !== -1) {
         const targetPlayer = room.players[existingSeatIndex];
         
         if (!targetPlayer.connected) {
-          // Reconnect hijack authorization sequence
           targetPlayer.ws = ws;
           targetPlayer.connected = true;
           playerRoom = room;
@@ -614,7 +605,6 @@ wss.on("connection", (ws) => {
       let room = rooms.get(code);
       if (!room) { ws.send(JSON.stringify({ type: "error", msg: "Room not found." })); return; }
       
-      // Duplication blocker lookups
       const nameTaken = room.players.some(p => p && p.name.toLowerCase() === name.toLowerCase());
       if (nameTaken) { ws.send(JSON.stringify({ type: "error", msg: "That name is already taken in this room." })); return; }
 
