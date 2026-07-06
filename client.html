@@ -46,6 +46,7 @@
   /* ── LAYOUT ── */
   .app { display: flex; flex-direction: column; min-height: 100vh; }
   .table-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+  .table-wrap { padding: 12px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
   .titlebar { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
   .titlebar h1 { font-family: Georgia, serif; font-size: 22px; margin: 0; color: var(--brass); }
   .titlebar .sub { font-size: 11px; opacity: 0.6; letter-spacing: 1px; text-transform: uppercase; }
@@ -167,13 +168,6 @@ function sortHand(hand, trumpSuit) {
   });
 }
 
-// Get or create unique session ID for the browser client
-let mySessionId = localStorage.getItem("bella_session_id");
-if (!mySessionId) {
-  mySessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  localStorage.setItem("bella_session_id", mySessionId);
-}
-
 let ws = null;
 let myName = "";
 let mySeat = null;
@@ -202,6 +196,10 @@ function renderLobby(error) {
 function renderTeamPicker(code, teamA, teamB, error) {
   const aFull = teamA.filter(Boolean).length >= 2;
   const bFull = teamB.filter(Boolean).length >= 2;
+  
+  // CRITICAL FIX: If this tab has already chosen a team, block further actions
+  const alreadyPicked = (myTeam !== null);
+
   const memberHtml = (members) => members.map((m, i) =>
     '<div class="team-member' + (m ? '' : ' empty') + '">' + esc(m || ('Slot ' + (i+1) + ' open')) + '</div>'
   ).join("");
@@ -214,10 +212,10 @@ function renderTeamPicker(code, teamA, teamB, error) {
       '<div style="font-size:12px;opacity:0.6;margin-bottom:12px;">Share this code — then pick your team</div>' +
       '<div class="team-grid">' +
         '<div class="team-col team-a"><h3>Team A</h3>' + memberHtml(teamA) +
-          '<button class="team-btn a" onclick="doJoinTeam(\'A\')" ' + (aFull ? 'disabled' : '') + '>Join Team A</button>' +
+          '<button class="team-btn a" onclick="doJoinTeam(\'A\')" ' + (aFull || alreadyPicked ? 'disabled' : '') + '>Join Team A</button>' +
         '</div>' +
         '<div class="team-col team-b"><h3>Team B</h3>' + memberHtml(teamB) +
-          '<button class="team-btn b" onclick="doJoinTeam(\'B\')" ' + (bFull ? 'disabled' : '') + '>Join Team B</button>' +
+          '<button class="team-btn b" onclick="doJoinTeam(\'B\')" ' + (bFull || alreadyPicked ? 'disabled' : '') + '>Join Team B</button>' +
         '</div>' +
       '</div>' +
       '<div class="waiting-msg">Game starts when both teams have 2 players.</div>' +
@@ -229,7 +227,7 @@ function doCreate() {
   const name = (document.getElementById("name-input")?.value || "").trim();
   if (!name) { renderLobby("Enter your name first."); return; }
   myName = name;
-  connectAndSend({ type: "create", name, sessionId: mySessionId });
+  connectAndSend({ type: "create", name });
 }
 
 function doJoinWithCode() {
@@ -247,7 +245,7 @@ function doJoinWithCode() {
 function doJoinTeam(team) {
   const code = pendingRoomCode || myRoomCode;
   if (!code) return;
-  send({ type: "join", name: myName, code, team, sessionId: mySessionId });
+  send({ type: "join", name: myName, code, team });
 }
 
 function connectAndSend(msg) {

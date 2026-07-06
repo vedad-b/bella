@@ -52,7 +52,7 @@ function dealInitial(deck) {
   return { hands, kitty };
 }
 function nextSeat(seat) { return (seat + 1) % 4; }
-function teamOf(seat) { return seat % 2; }
+function teamOf(seat) { return seat % 2; } // seats 0,2 = team 0 (A); seats 1,3 = team 1 (B)
 
 function currentWinningCard(trick, trumpSuit) {
   const ledSuit = trick[0].card.suit;
@@ -223,8 +223,8 @@ function generateRoomCode() {
 function createRoom(code) {
   const room = {
     code,
-    players: [null, null, null, null],
-    pending: [],
+    players: [null, null, null, null], // indexed by seat (0=A1, 1=B1, 2=A2, 3=B2)
+    pending: [], // unseated connections waiting to pick a team
     game: null,
     handNum: 0,
     teamScores: [0, 0],
@@ -376,6 +376,7 @@ function broadcastAll(room) {
       p.ws.send(JSON.stringify({ type: "state", state: buildStateForSeat(room, seat) }));
     }
   }
+  // Also push lobby state to unseated (pending) connections so they see team updates
   const lobbyState = lobbyStateForPending(room);
   for (const pws of (room.pending || [])) {
     if (pws.readyState === WebSocket.OPEN) {
@@ -424,12 +425,13 @@ function handleConfirmMelds(room, seat) {
     return null;
   }
 
+  // Check 8-card suit instant win before proceeding
   const eightCard = checkEightCardSuit(g.hands);
   if (eightCard) {
     const winnerTeam = teamOf(eightCard.seat);
     const winnerName = playerName(room, eightCard.seat);
     addLog(room, `${winnerName} holds all 8 ${eightCard.suit}! Instant game win!`, true);
-    room.teamScores[winnerTeam] = WINNING_SCORE + 1;
+    room.teamScores[winnerTeam] = WINNING_SCORE + 1; // force over threshold
     g.lastHandSummary = { pot: 0, scores: winnerTeam === 0 ? [WINNING_SCORE+1, room.teamScores[1]] : [room.teamScores[0], WINNING_SCORE+1], set: false, capot: false, instantWin: true, instantWinSuit: eightCard.suit, instantWinSeat: eightCard.seat };
     g.phase = "game-end";
     g.meldConfirms = null;
@@ -564,17 +566,21 @@ wss.on("connection", (ws) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
+    // ---- CREATE ROOM (no team yet, just gets a code) ----
     if (msg.type === "create") {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = generateRoomCode();
       const room = createRoom(code);
+      // Store room ref on ws so disconnect cleanup works before they pick a team
       ws._pendingRoom = room;
       room.pending.push(ws);
       ws.send(JSON.stringify({ type: "created", roomCode: code, name }));
+      // Also send a state so client has live lobby data right away
       broadcastAll(room);
       return;
     }
 
+    // ---- NEW: REGISTER PENDING CONNECTION TO LOBBY ----
     if (msg.type === "register_pending") {
       const code = (msg.code || "").toUpperCase().trim();
       let room = rooms.get(code);
@@ -585,31 +591,23 @@ wss.on("connection", (ws) => {
       return;
     }
 
+    // ---- JOIN ROOM + PICK TEAM ----
     if (msg.type === "join") {
       const name = (msg.name || "Player").trim().slice(0, 20) || "Player";
       const code = (msg.code || "").toUpperCase().trim();
-      const team = msg.team;
-      const sessionId = msg.sessionId;
+      const team = msg.team; // "A" or "B"
 
       let room = rooms.get(code);
       if (!room) { sendError(ws, "Room not found. Check the code and try again."); return; }
-      
-      // Lock Check: Verify if this session ID is already seated somewhere in the room
-      const alreadySeated = room.players.some(p => p && p.sessionId === sessionId);
-      if (alreadySeated) {
-        sendError(ws, "You have already joined a team in this room!");
-        return;
-      }
-
       if (!["A","B"].includes(team)) { sendError(ws, "Pick a team (A or B)."); return; }
       if (teamCount(room, team) >= 2) { sendError(ws, `Team ${team} is full (2 players max).`); return; }
       if (totalPlayers(room) >= 4) { sendError(ws, "Room is full."); return; }
 
       const seat = findEmptySeatOnTeam(room, team);
-      // Save sessionId alongside connection tracking
-      room.players[seat] = { ws, name, sessionId, connected: true };
+      room.players[seat] = { ws, name, connected: true };
       playerRoom = room;
       playerSeat = seat;
+      // Remove from pending list now that they have a seat
       room.pending = (room.pending || []).filter(p => p !== ws);
 
       ws.send(JSON.stringify({ type: "joined", roomCode: code, seat, name, team }));
